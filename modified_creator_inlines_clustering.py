@@ -4,9 +4,8 @@ import nltk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 from nltk.corpus import stopwords
-from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score, pairwise_distances_argmin_min
 import matplotlib.pyplot as plt
-from sklearn.metrics import pairwise_distances_argmin_min
 
 # A simple stopwords list (without nltk)
 STOPWORDS = set([
@@ -45,8 +44,43 @@ def vectorize_complaints(complaints):
     return X, vectorizer
 
 
+# Function to find the best number of clusters using the Elbow method and Silhouette score
+def find_best_num_clusters(X, max_clusters=10):
+    wcss = []
+    silhouette_scores = []
+
+    # Try KMeans with 2 to max_clusters clusters
+    for n_clusters in range(2, max_clusters + 1):
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        kmeans.fit(X)
+        wcss.append(kmeans.inertia_)  # Sum of squared distances to closest cluster center
+        labels = kmeans.labels_
+        silhouette_scores.append(silhouette_score(X, labels))  # Silhouette score for each n_clusters
+
+    # # Plot the WCSS (Elbow Method)
+    # plt.figure(figsize=(10, 5))
+    # plt.plot(range(2, max_clusters + 1), wcss, marker='o', linestyle='--', color='b')
+    # plt.title('Elbow Method - WCSS for each number of clusters')
+    # plt.xlabel('Number of clusters')
+    # plt.ylabel('WCSS')
+    # plt.show()
+    #
+    # # Plot the Silhouette Scores
+    # plt.figure(figsize=(10, 5))
+    # plt.plot(range(2, max_clusters + 1), silhouette_scores, marker='o', linestyle='--', color='g')
+    # plt.title('Silhouette Score for each number of clusters')
+    # plt.xlabel('Number of clusters')
+    # plt.ylabel('Silhouette Score')
+    # plt.show()
+
+    # Return the number of clusters with the best silhouette score
+    best_num_clusters = np.argmax(silhouette_scores) + 2  # Adding 2 because index starts at 0
+    print(f'Best number of clusters based on silhouette score: {best_num_clusters}')
+    return best_num_clusters
+
+
 # Perform clustering using KMeans
-def cluster_complaints(X, num_clusters=5):
+def cluster_complaints(X, num_clusters):
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
     kmeans.fit(X)
     return kmeans
@@ -81,9 +115,11 @@ def main(file_path):
 
     X, vectorizer = vectorize_complaints(complaints)
 
-    # Perform KMeans clustering
-    num_clusters = 5
-    kmeans = cluster_complaints(X, num_clusters=num_clusters)
+    # Automatically determine the best number of clusters
+    best_num_clusters = find_best_num_clusters(X, max_clusters=10)
+
+    # Perform KMeans clustering using the best number of clusters
+    kmeans = cluster_complaints(X, num_clusters=best_num_clusters)
 
     # Add cluster labels to the DataFrame
     df = pd.read_csv(file_path)
